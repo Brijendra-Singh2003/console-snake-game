@@ -1,8 +1,7 @@
 use crossterm::event::{self, Event, KeyCode};
 use rand::Rng;
 use std::{
-    collections::VecDeque,
-    time::{Duration, Instant},
+    collections::VecDeque, io::{self, Write}, time::{Duration, Instant}
 };
 use tokio::time::sleep;
 
@@ -61,6 +60,7 @@ impl Game {
         self.board[start_pos.y][start_pos.x] = SNAKE;
         self.snake.push_front(start_pos);
         self.spawn_food();
+        utils::clear_screen();
     }
 
     pub async fn start(&mut self) {
@@ -125,35 +125,38 @@ impl Game {
 
     async fn draw(&mut self) {
         let curr_time = Instant::now();
-        
+
         if curr_time - self.last_print_time >= self.print_interval {
             self.last_print_time = curr_time;
-            utils::clear_screen();
 
             if self.game_over {
+                utils::clear_screen();
                 println!("Game Over!\nPress 'r' to restart or 'q' to quit.");
                 return;
             }
 
             self.update();
 
+            let mut s: String = String::from("\x1B[H");
             for row in &self.board {
                 for cell in row {
-                    let val: String;
+                    let val;
 
                     if cell == &EMPTY {
-                        val = "- ".to_string();
+                        val = "-  ";
                     } else if cell == &FOOD {
-                        val = ":p".to_string();
+                        val = ":p ";
                     } else {
-                        val = "@ ".to_string();
+                        val = "@  ";
                     };
 
-                    print!("{} ", val);
+                    s.push_str(val);
                 }
-                println!();
+                s.push_str("\r\n");
             }
-            println!("Press 'r' to restart or 'q' to quit.");
+            println!("{}Press 'r' to restart or 'q' to quit.", s);
+
+            io::stdout().flush().unwrap();
         }
 
         sleep(Duration::from_millis(1)).await;
