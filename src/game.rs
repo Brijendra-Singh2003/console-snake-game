@@ -18,6 +18,7 @@ pub struct Game {
     snake: VecDeque<Coordinate>,
     direction: (i32, i32),
     is_game_over: bool,
+    score: i32,
 }
 
 const EMPTY: u8 = 0;
@@ -34,6 +35,7 @@ impl Game {
             snake: VecDeque::new(),
             direction: (1, 0),
             is_game_over: false,
+            score: 0,
         };
     }
 
@@ -47,6 +49,7 @@ impl Game {
         self.snake = VecDeque::new();
         self.direction = (1, 0);
         self.is_game_over = false;
+        self.score = 0;
 
         let start_pos = Coordinate {
             x: 0,
@@ -119,6 +122,7 @@ impl Game {
         self.snake.push_front(next_head);
         
         if is_consuming_food {
+            self.score += 1;
             self.spawn_new_food();
         } else {
             let tail = self.snake.back().unwrap();
@@ -131,11 +135,11 @@ impl Game {
     fn draw(&mut self) {
         if self.is_game_over {
             Game::clear_screen();
-            println!("Game Over!\nPress 'r' to restart or 'q' to quit.");
+            println!("Score: {}\nGame Over!\nPress 'r' to restart or 'q' to quit.", self.score);
             return;
         }
 
-        let mut s: String = String::from("\x1B[H");
+        let mut s = format!("\x1B[HScore: {}\n", self.score);
         for row in &self.board {
             for cell in row {
                 let val;
