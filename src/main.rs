@@ -1,7 +1,6 @@
 use crate::game::Game;
 
 mod game;
-mod utils;
 
 #[tokio::main]
 async fn main() {

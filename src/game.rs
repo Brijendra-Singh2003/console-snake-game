@@ -5,8 +5,6 @@ use std::{
 };
 use tokio::time::sleep;
 
-use super::utils;
-
 struct Coordinate {
     x: usize,
     y: usize,
@@ -16,11 +14,10 @@ pub struct Game {
     height: usize,
     width: usize,
     print_interval: Duration,
-    last_print_time: Instant,
     board: Vec<Vec<u8>>,
     snake: VecDeque<Coordinate>,
     direction: (i32, i32),
-    game_over: bool,
+    is_game_over: bool,
 }
 
 const EMPTY: u8 = 0;
@@ -33,11 +30,10 @@ impl Game {
             height: height,
             width: width,
             print_interval: Duration::from_millis(1000),
-            last_print_time: Instant::now(),
             board: Vec::new(),
             snake: VecDeque::new(),
             direction: (1, 0),
-            game_over: false,
+            is_game_over: false,
         };
     }
 
@@ -47,10 +43,10 @@ impl Game {
     }
 
     fn reset(&mut self) {
-        self.board = vec![vec![0; self.width]; self.height];
+        self.board = vec![vec![EMPTY; self.width]; self.height];
         self.snake = VecDeque::new();
         self.direction = (1, 0);
-        self.game_over = false;
+        self.is_game_over = false;
 
         let start_pos = Coordinate {
             x: 0,
@@ -59,11 +55,12 @@ impl Game {
 
         self.board[start_pos.y][start_pos.x] = SNAKE;
         self.snake.push_front(start_pos);
-        self.spawn_food();
-        utils::clear_screen();
+        self.spawn_new_food();
+        Game::clear_screen();
     }
 
     pub async fn start(&mut self) {
+        let mut last_print_time = Instant::now();
         self.reset();
 
         loop {
@@ -87,94 +84,99 @@ impl Game {
                     }
                 }
             }
+ 
+            let curr_time = Instant::now();
 
-            self.draw().await;
+            if curr_time - last_print_time >= self.print_interval && !self.is_game_over {
+                last_print_time = curr_time;
+
+                self.update();
+                self.draw();
+            }
+
+            sleep(Duration::from_millis(1)).await;
         }
     }
 
     fn update(&mut self) {
         let head = self.snake.front().unwrap();
-        let tail = self.snake.back().unwrap();
-
         let next_head = Coordinate {
             x: (head.x as i32 + self.direction.0) as usize,
             y: (head.y as i32 + self.direction.1) as usize,
         };
 
-        self.game_over = next_head.x >= self.width
+        self.is_game_over = next_head.x >= self.width
             || next_head.y >= self.height
             || self.board[next_head.y][next_head.x] == SNAKE;
 
-        if self.game_over {
+        if self.is_game_over {
             return;
         }
 
-        let consuming_food = self.board[next_head.y][next_head.x] == FOOD;
-        if !consuming_food {
+        let is_consuming_food = self.board[next_head.y][next_head.x] == FOOD;
+        
+        self.board[next_head.y][next_head.x] = SNAKE;
+        self.snake.push_front(next_head);
+        
+        if is_consuming_food {
+            self.spawn_new_food();
+        } else {
+            let tail = self.snake.back().unwrap();
+
             self.board[tail.y][tail.x] = EMPTY;
             self.snake.pop_back();
         }
-
-        self.board[next_head.y][next_head.x] = SNAKE;
-        self.snake.push_front(next_head);
-
-        if consuming_food {
-            self.spawn_food();
-        }
     }
 
-    async fn draw(&mut self) {
-        let curr_time = Instant::now();
-
-        if curr_time - self.last_print_time >= self.print_interval {
-            self.last_print_time = curr_time;
-
-            if self.game_over {
-                utils::clear_screen();
-                println!("Game Over!\nPress 'r' to restart or 'q' to quit.");
-                return;
-            }
-
-            self.update();
-
-            let mut s: String = String::from("\x1B[H");
-            for row in &self.board {
-                for cell in row {
-                    let val;
-
-                    if cell == &EMPTY {
-                        val = "-  ";
-                    } else if cell == &FOOD {
-                        val = ":p ";
-                    } else {
-                        val = "@  ";
-                    };
-
-                    s.push_str(val);
-                }
-                s.push_str("\r\n");
-            }
-            println!("{}Press 'r' to restart or 'q' to quit.", s);
-
-            io::stdout().flush().unwrap();
+    fn draw(&mut self) {
+        if self.is_game_over {
+            Game::clear_screen();
+            println!("Game Over!\nPress 'r' to restart or 'q' to quit.");
+            return;
         }
 
-        sleep(Duration::from_millis(1)).await;
+        let mut s: String = String::from("\x1B[H");
+        for row in &self.board {
+            for cell in row {
+                let val;
+
+                if *cell == EMPTY {
+                    val = "-  ";
+                } else if *cell == FOOD {
+                    val = ":p ";
+                } else {
+                    val = "@  ";
+                };
+
+                s.push_str(val);
+            }
+            s.push_str("\r\n");
+        }
+        println!("{}Press 'r' to restart or 'q' to quit.", s);
+
+        io::stdout().flush().unwrap();
     }
 
-    fn spawn_food(&mut self) {
+    fn spawn_new_food(&mut self) {
         let mut rng = rand::thread_rng();
 
         loop {
             let x = rng.gen::<usize>() % self.width;
             let y = rng.gen::<usize>() % self.height;
 
-            if self.board[y][x] != 0 {
+            if self.board[y][x] != EMPTY {
                 continue;
             }
 
             self.board[y][x] = FOOD;
             break;
         }
+    }
+
+    fn clear_screen() {
+        // print!("\x1B[2J\x1B[1;1H");
+        print!("\x1B[3J\x1B[2J\x1B[H");
+        // print!("\x1B[2J\x1B[H");
+        // print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
     }
 }
