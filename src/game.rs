@@ -5,6 +5,7 @@ use std::{
 };
 use tokio::time::sleep;
 
+#[derive(Clone, Copy, PartialEq)]
 struct Coordinate {
     x: usize,
     y: usize,
@@ -140,21 +141,35 @@ impl Game {
         }
 
         let mut s = format!("\x1B[HScore: {}\n", self.score);
-        for row in &self.board {
-            for cell in row {
+        let head_pos = self.snake.front().cloned();
+
+        for (y, row) in self.board.iter().enumerate() {
+            for (x, cell) in row.iter().enumerate() {
                 let val;
+                let color;
 
                 if *cell == EMPTY {
                     val = "-  ";
+                    color = "\x1B[90m"; // Dark Gray
                 } else if *cell == FOOD {
                     val = ":p ";
+                    color = "\x1B[31m"; // Red
                 } else {
                     val = "@  ";
-                };
-
+                    if let Some(head) = head_pos {
+                        if head.x == x && head.y == y {
+                            color = "\x1B[33m"; // Yellow for head
+                        } else {
+                            color = "\x1B[32m"; // Green for body
+                        }
+                    } else {
+                        color = "\x1B[32m";
+                    }
+                }
+                s.push_str(color);
                 s.push_str(val);
             }
-            s.push_str("\r\n");
+            s.push_str("\x1B[0m\r\n"); // Reset color at end of line
         }
         println!("{}Press 'r' to restart or 'q' to quit.", s);
 
